@@ -1,687 +1,408 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Pixel Brawlers - Difficulty Edition</title>
-
+    <title>Pixel Brawlers - Ranked Edition</title>
     <style>
-
         * { box-sizing: border-box; }
-
         body, html {
-
             margin: 0; padding: 0; width: 100%; height: 100%;
-
             background: #050508; color: #fff;
-
             font-family: 'Courier New', Courier, monospace;
-
             overflow: hidden; user-select: none;
-
         }
-
         #game-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; image-rendering: pixelated; }
-
         canvas { display: block; width: 100%; height: 100%; }
-
         .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
-
         .hidden { display: none !important; }
-
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 20px; width: 95%; max-width: 1200px; max-height: 70vh; overflow-y: auto; padding: 15px; border: 1px solid #333; background: #111; }
-
         .card { background: #1a1a1a; padding: 12px; border: 2px solid #444; cursor: pointer; text-align: center; transition: 0.2s; border-radius: 4px; }
-
         .card:hover { border-color: #00ffcc; background: #252525; transform: scale(1.02); }
-
         .selected { border-color: #fcc419 !important; background: #333 !important; }
-
         .type-tag { font-size: 10px; font-weight: bold; margin-top: 5px; display: block; letter-spacing: 1px; }
-
         .tag-ranged { color: #00ffcc; }
-
         .tag-melee { color: #ff3e3e; }
-
         #hud { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; pointer-events: none; }
-
         .bar-container { width: 32%; }
-
         .hp-bar { height: 24px; background: #222; border: 2px solid #fff; position: relative; overflow: hidden; }
-
         .hp-fill { height: 100%; background: #ff3e3e; transition: width 0.2s; }
-
         .super-bar { height: 10px; background: #111; border: 1px solid #555; margin-top: 6px; }
-
         .super-fill { height: 100%; background: #fcc419; width: 0%; box-shadow: 0 0 8px #fcc419; }
-
         .ammo-status { font-size: 13px; margin-top: 6px; font-weight: bold; text-shadow: 1px 1px #000; }
-
         button { font-family: inherit; padding: 18px 45px; cursor:pointer; font-size: 24px; background: #00ffcc; border:none; font-weight:bold; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); transition: 0.2s; margin: 10px; }
-
         button:hover { background: #fff; color: #000; transform: scale(1.05); }
-
         button.alt { background: #7048e8; color: #fff; }
-
         #victory-screen h1 { font-size: 80px; margin: 0; color: #fcc419; text-shadow: 0 0 20px rgba(252, 196, 25, 0.5); }
 
+        /* RANKED SYSTEM STYLES */
+        #ranked-menu h2 { color: #fcc419; margin-bottom: 5px; }
+        .rank-badge { font-size: 32px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #7048e8; margin: 10px 0; }
+        .rp-text { color: #00ffcc; font-size: 18px; margin-bottom: 20px; }
+        #matchmaking-screen h2 { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .rank-up-anim { color: #00ffcc; font-weight: bold; animation: slideUp 2s forwards; }
+        @keyframes slideUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-50px); opacity: 0; } }
     </style>
-
 </head>
-
 <body>
 
-
-
     <div id="game-container">
-
         <canvas id="gameCanvas"></canvas>
-
+        
         <div id="menu" class="overlay">
-
             <h1 style="font-size: 60px; color: #00ffcc; text-shadow: 4px 4px #7048e8;">PIXEL BRAWLERS</h1>
-
             <button onclick="setMode(false)">LOCAL PVP</button>
-
-            <button class="alt" onclick="setMode(true)">PLAY VS BOT</button>
-
+            <button class="alt" onclick="showRankedMenu()">RANKED (ONLINE)</button>
         </div>
 
+        <div id="ranked-menu" class="overlay hidden">
+            <h2>RANKED SEASON 1</h2>
+            <div class="rank-badge" id="display-rank-name">BRONZE I</div>
+            <div class="rp-text" id="display-rp">0 RP</div>
+            <button onclick="startMatchmaking()">START RANKED GAME</button>
+            <button class="alt" style="padding: 10px 25px; font-size: 16px;" onclick="resetToMenu()">BACK</button>
+        </div>
 
+        <div id="matchmaking-screen" class="overlay hidden">
+            <h2 style="color: #00ffcc;">FINDING REAL PLAYERS...</h2>
+            <p id="match-timer">00:03</p>
+            <p style="font-size: 12px; color: #555;">Server: North America (West)</p>
+        </div>
 
         <div id="difficulty-selection" class="overlay hidden">
-
             <h2>SELECT BOT DIFFICULTY</h2>
-
             <button onclick="setDifficulty('easy')" style="background: #40c057;">EASY</button>
-
             <button onclick="setDifficulty('medium')" style="background: #fcc419; color: #000;">MEDIUM</button>
-
             <button onclick="setDifficulty('hard')" style="background: #ff3e3e;">HARD</button>
-
         </div>
-
-
 
         <div id="char-selection" class="overlay hidden">
-
             <h2 id="selection-title">P1: SELECT HERO</h2>
-
             <div class="grid" id="char-grid"></div>
-
         </div>
-
         <div id="map-selection" class="overlay hidden">
-
             <h2>SELECT BATTLEGROUND</h2>
-
             <div class="grid" id="map-grid"></div>
-
         </div>
-
         <div id="victory-screen" class="overlay hidden">
-
             <h1 id="winner-text">P1 WINS!</h1>
-
+            <div id="rank-result" style="font-size: 24px; margin: 15px 0;"></div>
             <button onclick="resetToMenu()">RETURN TO MENU</button>
-
         </div>
-
         <div id="hud" class="hidden">
-
             <div class="bar-container"><div id="p1-name" style="color:#00ffcc;">P1</div><div class="hp-bar"><div id="p1-hp" class="hp-fill"></div></div><div class="super-bar"><div id="p1-super" class="super-fill"></div></div><div id="p1-ammo" class="ammo-status" style="color:#00ffcc;"></div></div>
-
             <div class="bar-container" style="text-align:right;"><div id="p2-name" style="color:#7048e8;">P2</div><div class="hp-bar"><div id="p2-hp" class="hp-fill"></div></div><div class="super-bar"><div id="p2-super" class="super-fill"></div></div><div id="p2-ammo" class="ammo-status" style="color:#7048e8;"></div></div>
-
         </div>
-
     </div>
 
-
-
 <script>
+    const RANKS = ["BRONZE", "SILVER", "GOLD", "PLATINUM", "DIAMOND", "MASTER", "GRANDMASTER"];
+    const SUB_RANKS = ["I", "II", "III"];
+    let userRP = parseInt(localStorage.getItem('pixelBrawlerRP')) || 0;
+    let isRankedMode = false;
+
+    function getRankInfo(rp) {
+        const tierSize = 100;
+        const totalSubRanks = RANKS.length * 3;
+        let level = Math.floor(rp / tierSize);
+        if (level >= totalSubRanks) level = totalSubRanks - 1;
+        const tierIdx = Math.floor(level / 3);
+        const subIdx = level % 3;
+        return { name: `${RANKS[tierIdx]} ${SUB_RANKS[subIdx]}`, color: tierIdx === 0 ? '#cd7f32' : tierIdx === 1 ? '#c0c0c0' : tierIdx === 2 ? '#ffd700' : '#00ffff' };
+    }
+
+    function updateRankDisplay() {
+        const info = getRankInfo(userRP);
+        document.getElementById('display-rank-name').innerText = info.name;
+        document.getElementById('display-rank-name').style.color = info.color;
+        document.getElementById('display-rp').innerText = `${userRP} RP`;
+    }
+
+    function showRankedMenu() {
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('ranked-menu').classList.remove('hidden');
+        updateRankDisplay();
+    }
+
+    function startMatchmaking() {
+        document.getElementById('ranked-menu').classList.add('hidden');
+        document.getElementById('matchmaking-screen').classList.remove('hidden');
+        isRankedMode = true;
+        let timeLeft = 3;
+        const interval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('match-timer').innerText = `00:0${timeLeft}`;
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                document.getElementById('matchmaking-screen').classList.add('hidden');
+                setDifficulty('medium');
+            }
+        }, 1000);
+    }
 
     const canvas = document.getElementById('gameCanvas');
-
     const ctx = canvas.getContext('2d');
-
     let W, H, GROUND_Y, P_SCALE;
-
     function initLayout() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; GROUND_Y = H * 0.85; P_SCALE = Math.max(4, Math.min(W / 180, H / 100)); }
-
     window.addEventListener('resize', initLayout);
-
     initLayout();
 
-
-
-    const COLORS = { P:'#7048e8', S:'#ced4da', K:'#ffd8a8', X:'#111', W:'#f8f9fa', r:'#e03131', y:'#fcc419', G:'#495057', B:'#1971c2', V:'#5f0a0a', L:'#74c0fc', M:'#2b8a3e', O:'#e67e22', D:'#343a40' };
-
+    const COLORS = { P:'#7048e8', S:'#ced4da', K:'#ffd8a8', X:'#111', W:'#f8f9fa', r:'#e03131', y:'#fcc419', G:'#495057', B:'#1971c2', V:'#5f0a0a', L:'#74c0fc', M:'#2b8a3e', O:'#e67e22', D:'#343a40', A:'#b2f2bb', C:'#868e96', J:'#3b5bdb' };
+    
     const PIXELS = {
-
-        wizard: ["  PPPP  "," PPPPPP "," PPSKPP ","  KKK   "," PPPPPP "," P BBBB "," P BBBB "," PP  PP "],
-
+        wizard: ["  PPPP  "," MMMMMM "," PPSKPP ","  KKK   "," PPPPPP "," P BBBB "," P BBBB "," PP  PP "],
         tank:   [" SSSSS  "," SSSSS  "," SKS S  "," SSSSS  "," SSSSS  "," SSSSS  "," SSSSS  "," SS  SS "],
-
         gunner: [" GGGGG  "," GKKKG  "," GGGGG  ","  KKK   "," BBBBB  "," BBBBS  "," BBBBS  "," BB  BB "],
-
         ninja:  ["  XXXX  "," XXXXXX "," XK XK  ","  XXX   "," XXXXX  "," XXXXX  "," XXXXX  "," XX  XX "],
-
         blaze:  ["  rrr   "," rrrrr  "," rKSKr  ","  rrr   "," rOrOr  "," rrrrr  "," rrrrr  "," rr  rr "],
-
         reaper: ["  XXXX  "," XXXXX  "," XGXGX  ","  GGG   "," XXXXXX "," XXXXX  "," XXXXX  "," X    X "],
-
         medic:  ["  WWWW  "," WWWWW  "," WKWKW  ","  KKK   "," WWWWW  "," WWrWW  "," WWWWW  "," WW  WW "],
-
         archer: ["  MMMM  "," MMMMMM "," MSKSM  ","  KKK   "," MMMMMM "," MMMMM  "," MMMMM  "," MM  MM "],
-
         vampire:["  VVVV  "," VVVVV  "," VKSKV  ","  KKK   "," XXXXXX "," X V X  "," X V X  "," X    X "],
-
         storm:  ["  WWWW  "," WWWWWW "," WSKSW  ","  LLL   "," LLLLLL "," LLLLLL "," LLLLLL "," LL  LL "],
-
         paladin:["  SSSS  "," SSSSS  "," SSKSW  ","  SSS   "," SSSSS  "," SOSSOS "," SSSSS  "," SS  SS "],
-
         bomber: ["  GGGG  "," GGGGG  "," GKXKG  ","  GGG   "," DDDDDD "," DDDDDD "," DDDDDD "," DD  DD "],
-
         ghost:  ["  WWWW  "," WWWWW  "," W B B  ","  WWW   "," WWWWWW "," WWWWW  "," WWWWW  "," W    W "],
-
+        sniper: ["  GGGG  "," GKKKG  "," GGGGG  ","  KKK   "," GGGGG  "," G   G  "," G   G  "," G   G  "],
+        frost:  ["  LLLL  "," LLLLLL "," LKSKL  ","  LLL   "," LLLLLL "," LLLLLL "," LLLLLL "," LL  LL "],
+        spark:  ["  yyyy  "," yyyyyy "," yKSKy  ","  yyy   "," yyyyyy "," yyyyyy "," yyyyyy "," yy  yy "],
+        phoenix:["  rrr   "," rOrOr  "," rKSKr  ","  rrr   "," rrrrr  "," rrrrr  "," rrrrr  "," rr  rr "],
+        pirate: ["  XXXX  "," XK XK  "," XXXXX  ","  KKK   "," BBBBB  "," BOOOB  "," BBBBB  "," BB  BB "],
+        alien:  ["  AAAA  "," AAAAAA "," AKXKA  ","  AAA   "," AAAAAA "," AAAAA  "," AAAAA  "," AA  AA "],
+        cyborg: ["  CCCC  "," CCCCC  "," CKSCC  ","  CCC   "," CCCCCC "," CS SSC "," CCCCCC "," CC  CC "],
+        knight: ["  SSSS  "," SSSKS  "," SSSSS  ","  SSS   "," SSSSS  "," SSSSS  "," SSSSS  "," SS  SS "],
+        samurai:["  XXXX  "," XK XK  "," XXXXX  ","  KKK   "," rrrrr  "," rrrrr  "," rrrrr  "," rr  rr "],
+        boxer:  ["  KKKK  "," KKKKKK "," KK KK  ","  KKK   "," KKKKKK "," KKKKKK "," KKKKKK "," KK  KK "],
+        ufo:    ["   XXXX   ","  XAAAAX  "," XAAAAAAX ","  XXXXXX  "],
         punch:  ["        ","  KKKK  "," KKKKKK "," KKKKKK "," KKKKKK ","  KKKK  ","        ","        "]
-
     };
-
-
 
     const CLASSES = {
-
         wizard: { hp: 100, speed: 1.3, type: 'ranged', dmg: 3,  cd: 22 },
-
         tank:   { hp: 240, speed: 0.7, type: 'melee',  dmg: 18, cd: 60 },
-
         gunner: { hp: 100, speed: 1.6, type: 'ranged', dmg: 5,  cd: 12 },
-
         ninja:  { hp: 85,  speed: 2.2, type: 'melee',  dmg: 9,  cd: 15 },
-
         blaze:  { hp: 110, speed: 1.2, type: 'ranged', dmg: 14, cd: 35 },
-
         reaper: { hp: 120, speed: 1.1, type: 'ranged', dmg: 22, cd: 55 },
-
         medic:  { hp: 150, speed: 1.7, type: 'ranged', dmg: 3,  cd: 10 },
-
         archer: { hp: 90,  speed: 1.5, type: 'ranged', dmg: 7,  cd: 18 },
-
         vampire:{ hp: 110, speed: 1.4, type: 'melee',  dmg: 12, cd: 25 },
-
         storm:  { hp: 100, speed: 1.5, type: 'ranged', dmg: 4,  cd: 12 },
-
         paladin:{ hp: 190, speed: 0.9, type: 'melee',  dmg: 15, cd: 40 },
-
         bomber: { hp: 120, speed: 1.1, type: 'ranged', dmg: 20, cd: 50 },
-
-        ghost:  { hp: 80,  speed: 1.9, type: 'melee',  dmg: 11, cd: 20 }
-
+        ghost:  { hp: 80,  speed: 1.9, type: 'melee',  dmg: 11, cd: 20 },
+        sniper: { hp: 80,  speed: 1.2, type: 'ranged', dmg: 30, cd: 70 },
+        frost:  { hp: 110, speed: 1.4, type: 'ranged', dmg: 6,  cd: 20 },
+        spark:  { hp: 95,  speed: 1.8, type: 'ranged', dmg: 4,  cd: 8 },
+        phoenix:{ hp: 130, speed: 1.3, type: 'ranged', dmg: 12, cd: 30 },
+        pirate: { hp: 115, speed: 1.5, type: 'ranged', dmg: 10, cd: 25 },
+        alien:  { hp: 90,  speed: 1.7, type: 'ranged', dmg: 8,  cd: 15 },
+        cyborg: { hp: 140, speed: 1.1, type: 'ranged', dmg: 11, cd: 22 },
+        knight: { hp: 180, speed: 1.0, type: 'melee',  dmg: 14, cd: 30 },
+        samurai:{ hp: 100, speed: 2.0, type: 'melee',  dmg: 13, cd: 20 },
+        boxer:  { hp: 150, speed: 1.6, type: 'melee',  dmg: 10, cd: 12 }
     };
-
-
 
     const MAPS = {
-
         void:    { name: "The Void", bg: "#0d0d16", ground: "#161625", accent: "#333", effect: 'none' },
-
         volcano: { name: "Magma Chamber", bg: "#2b0a0a", ground: "#4a0000", accent: "#ff4500", effect: 'embers' },
-
         forest:  { name: "Deep Woods", bg: "#0a1a0a", ground: "#1a2e1a", accent: "#2b8a3e", effect: 'leaves' },
-
         cyber:   { name: "Neon City", bg: "#0a0a1a", ground: "#001a33", accent: "#00f2ff", effect: 'rain' },
-
         desert:  { name: "Dust Bowl", bg: "#2e251a", ground: "#3d3224", accent: "#d4a373", effect: 'dust' },
-
         glacier: { name: "Glacier Peak", bg: "#1a2b3c", ground: "#ffffff", accent: "#74c0fc", effect: 'snow' },
-
         toxic:   { name: "Toxic Lab", bg: "#0a1a0a", ground: "#1a3a1a", accent: "#a6e22e", effect: 'bubbles' },
-
         night:   { name: "Midnight Roof", bg: "#1a0a25", ground: "#251a35", accent: "#7048e8", effect: 'none' },
-
         temple:  { name: "Golden Temple", bg: "#3a1a1a", ground: "#fcc419", accent: "#e03131", effect: 'none' },
-
         hive:    { name: "The Hive", bg: "#1a1a05", ground: "#222", accent: "#fcc419", effect: 'none' },
-
         deep:    { name: "Deep Sea", bg: "#051a25", ground: "#0a2a35", accent: "#1971c2", effect: 'bubbles' }
-
     };
 
-
-
     let gameState = 'MENU', p1, p2, currentMap = MAPS.void;
-
     let projectiles = [], particles = [], envParticles = [], keys = {}, selectingPlayer = 1, selectedP1 = null;
-
     let screenShake = 0, flash = 0, vsBot = false, botDiff = 'medium';
 
-
-
     function setMode(isBot) { 
-
         vsBot = isBot; 
-
         document.getElementById('menu').classList.add('hidden');
-
-        if(isBot) {
-
-            document.getElementById('difficulty-selection').classList.remove('hidden');
-
-        } else {
-
-            showCharSelection();
-
-        }
-
+        if(isBot) { document.getElementById('difficulty-selection').classList.remove('hidden'); } 
+        else { showCharSelection(); }
     }
 
-
-
-    function setDifficulty(diff) {
-
-        botDiff = diff;
-
-        document.getElementById('difficulty-selection').classList.add('hidden');
-
-        showCharSelection();
-
-    }
-
-
+    function setDifficulty(diff) { botDiff = diff; document.getElementById('difficulty-selection').classList.add('hidden'); showCharSelection(); }
 
     function showCharSelection() {
-
         selectingPlayer = 1; selectedP1 = null;
-
         document.getElementById('victory-screen').classList.add('hidden');
-
         document.getElementById('char-selection').classList.remove('hidden');
-
         document.getElementById('selection-title').innerText = "P1: SELECT HERO";
-
         const grid = document.getElementById('char-grid'); grid.innerHTML = '';
-
         Object.keys(CLASSES).forEach(key => {
-
             const data = CLASSES[key];
-
             const card = document.createElement('div'); card.className = 'card';
-
             const typeClass = data.type === 'ranged' ? 'tag-ranged' : 'tag-melee';
-
             card.innerHTML = `<strong>${key.toUpperCase()}</strong><span class="type-tag ${typeClass}">[${data.type.toUpperCase()}]</span>`;
-
             card.onclick = () => {
-
                 if (selectingPlayer === 1) { 
-
                     selectedP1 = key; 
-
-                    if(vsBot) {
-
-                        const keysArr = Object.keys(CLASSES);
-
-                        const randomBot = keysArr[Math.floor(Math.random() * keysArr.length)];
-
+                    if(vsBot || isRankedMode) {
+                        const randomBot = Object.keys(CLASSES)[Math.floor(Math.random() * Object.keys(CLASSES).length)];
                         showMapSelection(selectedP1, randomBot);
-
-                    } else {
-
-                        selectingPlayer = 2; card.classList.add('selected'); 
-
-                        document.getElementById('selection-title').innerText = "P2: SELECT HERO"; 
-
-                    }
-
+                    } else { selectingPlayer = 2; card.classList.add('selected'); document.getElementById('selection-title').innerText = "P2: SELECT HERO"; }
                 }
-
                 else { showMapSelection(selectedP1, key); }
-
             };
-
             grid.appendChild(card);
-
         });
-
     }
-
-
 
     function showMapSelection(c1, c2) {
-
         document.getElementById('char-selection').classList.add('hidden');
-
         document.getElementById('map-selection').classList.remove('hidden');
-
         const grid = document.getElementById('map-grid'); grid.innerHTML = '';
-
         Object.keys(MAPS).forEach(key => {
-
             const card = document.createElement('div'); card.className = 'card';
-
             card.style.borderLeft = `8px solid ${MAPS[key].accent}`;
-
             card.innerHTML = `<strong>${MAPS[key].name}</strong>`;
-
             card.onclick = () => { currentMap = MAPS[key]; startMatch(c1, c2); };
-
             grid.appendChild(card);
-
         });
-
     }
-
-
 
     function startMatch(c1, c2) {
-
         projectiles = []; particles = []; envParticles = [];
-
         p1 = new Player(W*0.2, GROUND_Y-50, 1, c1, false); 
-
-        p2 = new Player(W*0.8, GROUND_Y-50, 2, c2, vsBot);
-
+        p2 = new Player(W*0.8, GROUND_Y-50, 2, c2, (vsBot || isRankedMode));
         document.getElementById('map-selection').classList.add('hidden');
-
         document.getElementById('hud').classList.remove('hidden');
-
         document.getElementById('p1-name').innerText = c1.toUpperCase();
-
-        document.getElementById('p2-name').innerText = vsBot ? `${c2.toUpperCase()} (${botDiff.toUpperCase()} BOT)` : c2.toUpperCase();
-
+        const fakeNames = ["ShadowNinja", "BrawlStar_07", "DarkVoid", "PixelKing", "GlitchFixer"];
+        const p2Display = isRankedMode ? fakeNames[Math.floor(Math.random()*fakeNames.length)] : c2.toUpperCase();
+        document.getElementById('p2-name').innerText = (vsBot && !isRankedMode) ? `${c2.toUpperCase()} (${botDiff.toUpperCase()} BOT)` : p2Display;
         gameState = 'PLAYING';
-
     }
 
-
-
-    function resetToMenu() {
-
-        gameState = 'MENU'; document.getElementById('victory-screen').classList.add('hidden');
-
-        document.getElementById('hud').classList.add('hidden'); document.getElementById('menu').classList.remove('hidden');
-
-    }
-
-
+    function resetToMenu() { isRankedMode = false; gameState = 'MENU'; document.getElementById('victory-screen').classList.add('hidden'); document.getElementById('ranked-menu').classList.add('hidden'); document.getElementById('hud').classList.add('hidden'); document.getElementById('menu').classList.remove('hidden'); }
 
     class Player {
-
         constructor(x, y, id, classKey, isBot) {
-
             this.id = id; this.classKey = classKey; this.x = x; this.y = y; this.isBot = isBot;
-
             const data = CLASSES[classKey];
-
-            this.hp = data.hp; 
-
-            if(isBot && botDiff === 'hard') this.hp += 50; // Hard mode buff
-
-            this.maxHp = this.hp; 
-
-            this.speed = data.speed * (W/500); 
-
-            if(isBot && botDiff === 'hard') this.speed *= 1.2;
-
-            if(isBot && botDiff === 'easy') this.speed *= 0.7;
-
-
-
+            this.hp = data.hp + (isBot && botDiff === 'hard' ? 50 : 0); 
+            this.maxHp = this.hp; this.baseSpeed = data.speed * (W/500); 
+            this.speed = this.baseSpeed * (isBot && botDiff === 'hard' ? 1.2 : (isBot && botDiff === 'easy' ? 0.7 : 1));
             this.w = P_SCALE * 8; this.h = P_SCALE * 8; this.vx = 0; this.vy = 0;
-
             this.facing = id === 1 ? 1 : -1; this.grounded = false;
-
             this.superMeter = 0; this.atkCD = 0; this.shotsFired = 0; this.isReloading = false;
-
             this.frozen = 0; this.shield = 0; this.invis = 0; this.type = data.type;
-
-            this.punchFrame = 0;
-
+            this.punchFrame = 0; this.combo = 0; this.comboTimer = 0; this.mechTime = 0; this.ufoActive = null; this.sliceEffect = 0;
         }
-
-
 
         update(opp) {
-
+            if (this.comboTimer > 0 && --this.comboTimer <= 0) this.combo = 0;
+            if (this.mechTime > 0 && --this.mechTime <= 0) { this.speed = this.baseSpeed; this.w = P_SCALE * 8; this.h = P_SCALE * 8; }
             if (this.frozen > 0) { this.frozen--; return; }
-
             this.facing = (opp.x > this.x) ? 1 : -1;
-
-            
-
             let l, r, j, a, s;
-
-
-
             if (this.isBot) {
-
-                const dist = Math.abs(this.x - opp.x);
-
-                const idealDist = this.type === 'ranged' ? 400 : 40;
-
-                const reactionChance = botDiff === 'easy' ? 0.01 : (botDiff === 'medium' ? 0.03 : 0.08);
-
-                
-
-                // AI Movement
-
-                if (dist > idealDist + 20) { if(opp.x < this.x) l=true; else r=true; }
-
-                else if (dist < idealDist - 20) { if(opp.x < this.x) r=true; else l=true; }
-
-                
-
-                // AI Jump 
-
-                if (Math.random() < reactionChance && this.grounded) j = true;
-
-                
-
-                // AI Attack
-
-                if (dist < (this.type === 'ranged' ? 600 : 120) && Math.random() < reactionChance * 5) a = true;
-
+                const dist = Math.abs(this.x - opp.x), idealDist = this.type === 'ranged' ? 400 : 40, react = botDiff === 'easy' ? 0.01 : (botDiff === 'medium' ? 0.03 : 0.08);
+                if (dist > idealDist + 20) { if(opp.x < this.x) l=true; else r=true; } else if (dist < idealDist - 20) { if(opp.x < this.x) r=true; else l=true; }
+                if (Math.random() < react && this.grounded) j = true;
+                if (dist < (this.type === 'ranged' ? 600 : 120) && Math.random() < react * 5) a = true;
                 if (this.superMeter >= 100) s = true;
-
-
-
             } else {
-
                 const isP1 = this.id === 1;
-
-                l = isP1 ? keys['a'] : keys['arrowleft'];
-
-                r = isP1 ? keys['d'] : keys['arrowright'];
-
-                j = isP1 ? keys['w'] : keys['arrowup'];
-
-                a = isP1 ? keys['f'] : keys['arrowdown'];
-
-                s = isP1 ? keys['s'] : keys['shift'];
-
+                l = isP1 ? keys['a'] : keys['arrowleft']; r = isP1 ? keys['d'] : keys['arrowright'];
+                j = isP1 ? keys['w'] : keys['arrowup']; a = isP1 ? keys['f'] : keys['arrowdown']; s = isP1 ? keys['s'] : keys['shift'];
             }
-
-
-
             if (l) this.vx = -this.speed; else if (r) this.vx = this.speed; else this.vx = 0;
-
             if (j && this.grounded) { this.vy = -16; this.grounded = false; }
-
             if (a && this.atkCD <= 0 && !this.isReloading) this.attack(opp);
-
             if (s && this.superMeter >= 100) this.useSuper(opp);
-
-
-
             this.vy += 0.7; this.x += this.vx; this.y += this.vy;
-
             if (this.y >= GROUND_Y - this.h) { this.y = GROUND_Y - this.h; this.vy = 0; this.grounded = true; }
-
             this.x = Math.max(0, Math.min(W - this.w, this.x));
-
             if (this.atkCD > 0) this.atkCD--;
-
-            if (this.superMeter < 100) this.superMeter += 0.0556;
-
-            if (this.shield > 0) this.shield--;
-
-            if (this.invis > 0) this.invis--;
-
-            if (this.punchFrame > 0) this.punchFrame--;
-
+            if (this.superMeter < 100) this.superMeter += 0.1; 
+            if (this.shield > 0) this.shield--; if (this.invis > 0) this.invis--; if (this.punchFrame > 0) this.punchFrame--; if (this.sliceEffect > 0) this.sliceEffect--;
+            if (this.ufoActive) {
+                if (--this.ufoActive.timer > 60) this.ufoActive.x += (opp.x - this.ufoActive.x) * 0.1;
+                if (this.ufoActive.timer === 30 && Math.abs(this.ufoActive.x - opp.x) < 50 && opp.grounded) { opp.takeHit(30); this.addCombo(); }
+                if (this.ufoActive.timer <= 0) this.ufoActive = null;
+            }
         }
 
-
+        addCombo() { this.combo++; this.comboTimer = 90; }
 
         attack(opp) {
-
-            const data = CLASSES[this.classKey];
-
+            let dmg = CLASSES[this.classKey].dmg * (this.mechTime > 0 ? 1.5 : 1);
             if (this.type === 'ranged') {
-
-                projectiles.push({ x: this.x + (this.facing === 1 ? this.w : -15), y: this.y + this.h/3, vx: this.facing * 14, owner: this.id, dmg: data.dmg, c: this.classKey });
-
-                this.shotsFired++;
-
-                if (this.shotsFired >= 10) { this.isReloading = true; setTimeout(() => { this.shotsFired = 0; this.isReloading = false; }, 3000); }
-
+                projectiles.push({ x: this.x + (this.facing === 1 ? this.w : -15), y: this.y + this.h/3, vx: this.facing * 14, owner: this.id, dmg: dmg, c: this.classKey });
+                if (++this.shotsFired >= 10) { this.isReloading = true; setTimeout(() => { this.shotsFired = 0; this.isReloading = false; }, 3000); }
             } else {
-
                 this.punchFrame = 10;
-
-                if (Math.abs(this.x - opp.x) < this.w * 2.5 && Math.abs(this.y - opp.y) < this.h) {
-
-                    opp.takeHit(data.dmg);
-
-                    if (this.classKey === 'vampire') this.hp = Math.min(this.maxHp, this.hp + 4);
-
-                }
-
+                if (Math.abs(this.x - opp.x) < this.w * 2.5 && Math.abs(this.y - opp.y) < this.h) { opp.takeHit(dmg); this.addCombo(); if (this.classKey === 'vampire') this.hp = Math.min(this.maxHp, this.hp + 4); }
             }
-
-            this.atkCD = (this.isBot && botDiff === 'hard') ? data.cd * 0.8 : data.cd;
-
+            this.atkCD = CLASSES[this.classKey].cd * (this.isBot && botDiff === 'hard' ? 0.8 : 1);
         }
 
-
-
-        useSuper(opp) { this.superMeter = 0; screenShake = 15; flash = 5; if (this.classKey === 'wizard') opp.frozen = 180; else if (this.classKey === 'paladin') this.shield = 400; else if (this.classKey === 'ninja' || this.classKey === 'ghost') this.invis = 400; else if (this.classKey === 'tank') { if(Math.abs(this.x-opp.x)<250) opp.takeHit(55); } else if (this.classKey === 'storm') { opp.takeHit(45); createParticles(opp.x, opp.y, '#74c0fc'); } else if (this.classKey === 'medic') this.hp = Math.min(this.maxHp, this.hp + 60); else { projectiles.push({ x: this.x, y: this.y + this.h/2, vx: this.facing * 22, owner: this.id, dmg: 50, c: 'super' }); } }
+        useSuper(opp) { 
+            this.superMeter = 0; screenShake = 15; flash = 5; 
+            if (this.classKey === 'samurai') { this.sliceEffect = 40; if (opp.grounded) { opp.takeHit(50); this.addCombo(); } } 
+            else if (this.classKey === 'tank') { this.mechTime = 600; this.w = P_SCALE * 12; this.h = P_SCALE * 12; this.y -= this.h; }
+            else if (this.classKey === 'alien') this.ufoActive = { x: opp.x, y: 50, timer: 120 };
+            else if (this.classKey === 'wizard') opp.frozen = 180; 
+            else if (this.classKey === 'paladin') this.shield = 400; 
+            else if (this.classKey === 'ninja' || this.classKey === 'ghost') this.invis = 400; 
+            else if (this.classKey === 'storm') { opp.takeHit(45); this.addCombo(); createParticles(opp.x, opp.y, '#74c0fc'); } 
+            else if (this.classKey === 'medic') this.hp = Math.min(this.maxHp, this.hp + 60); 
+            else projectiles.push({ x: this.x, y: this.y + this.h/2, vx: this.facing * 22, owner: this.id, dmg: 50, c: 'super' });
+        }
 
         takeHit(dmg) { if (this.shield > 0 || (this.invis > 0 && this.classKey === 'ghost')) return; this.hp -= dmg; screenShake = 5; createParticles(this.x+this.w/2, this.y+this.h/2, 'red', 12); }
 
-
-
         draw() {
-
-            let op = this.invis > 0 ? 0.2 : 1;
-
-            drawPixelArt(this.x, this.y, PIXELS[this.classKey], P_SCALE, this.facing === -1, op);
-
-            if (this.punchFrame > 0) { const px = this.facing === 1 ? this.x + this.w : this.x - (P_SCALE*8); drawPixelArt(px, this.y + (P_SCALE*2), PIXELS.punch, P_SCALE, this.facing === -1, 1); }
-
+            let op = this.invis > 0 ? 0.2 : 1, currentScale = this.mechTime > 0 ? P_SCALE * 1.5 : P_SCALE;
+            if (this.sliceEffect > 0) { ctx.strokeStyle = `rgba(255, 255, 255, ${this.sliceEffect/40})`; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(0, GROUND_Y - 20); ctx.lineTo(W, GROUND_Y - 20); ctx.stroke(); }
+            if (this.ufoActive) { drawPixelArt(this.ufoActive.x - 20, this.ufoActive.y, PIXELS.ufo, P_SCALE, false, 1); if (this.ufoActive.timer < 35 && this.ufoActive.timer > 20) { ctx.fillStyle = "rgba(0, 255, 204, 0.4)"; ctx.fillRect(this.ufoActive.x - 10, this.ufoActive.y + 20, 40, GROUND_Y); } }
+            drawPixelArt(this.x, this.y, PIXELS[this.classKey], currentScale, this.facing === -1, op);
+            if (this.punchFrame > 0) { const px = this.facing === 1 ? this.x + this.w : this.x - (currentScale*8); drawPixelArt(px, this.y + (currentScale*2), PIXELS.punch, currentScale, this.facing === -1, 1); }
             if (this.shield > 0) { ctx.strokeStyle = '#fcc419'; ctx.lineWidth = 3; ctx.strokeRect(this.x-4, this.y-4, this.w+8, this.h+8); }
-
-            ctx.save(); ctx.font = `bold ${P_SCALE * 3}px Courier New`; ctx.textAlign = "center"; ctx.fillStyle = this.id === 1 ? '#00ffcc' : '#7048e8'; const bob = Math.sin(Date.now() / 200) * 5; ctx.fillText(`P${this.id}${this.isBot ? " (BOT)":""}`, this.x + this.w / 2, this.y - 15 + bob); ctx.restore();
-
+            ctx.save(); ctx.font = `bold ${P_SCALE * 3}px Courier New`; ctx.textAlign = "center"; 
+            ctx.fillStyle = this.id === 1 ? '#00ffcc' : '#7048e8'; 
+            const bob = Math.sin(Date.now() / 200) * 5; 
+            
+            // LOGIC FOR HOVER TEXT
+            let displayName = this.id === 1 ? "P1" : document.getElementById('p2-name').innerText;
+            if (isRankedMode && this.id === 1) displayName = "YOU";
+            
+            ctx.fillText(displayName, this.x + this.w / 2, this.y - 15 + bob); 
+            if(this.combo >= 2) { ctx.fillStyle = "#ffcc00"; ctx.font = `bold ${P_SCALE * 4}px Courier New`; ctx.fillText(`${this.combo}X COMBO!`, this.x + this.w / 2, this.y - 45 + bob); }
+            ctx.restore();
         }
-
     }
 
-
-
-    function drawPixelArt(x, y, arr, scale, flip, op) {
-
-        ctx.save(); ctx.globalAlpha = op; ctx.translate(x + (flip ? scale*8 : 0), y); if(flip) ctx.scale(-1, 1);
-
-        arr.forEach((row, r) => { row.split('').forEach((char, c) => { if(char!==' '){ ctx.fillStyle=COLORS[char] || '#fff'; ctx.fillRect(c*scale, r*scale, scale, scale); } }); });
-
-        ctx.restore();
-
-    }
-
-
-
+    function drawPixelArt(x, y, arr, scale, flip, op) { ctx.save(); ctx.globalAlpha = op; ctx.translate(x + (flip ? scale*8 : 0), y); if(flip) ctx.scale(-1, 1); arr.forEach((row, r) => { row.split('').forEach((char, c) => { if(char!==' '){ ctx.fillStyle=COLORS[char] || '#fff'; ctx.fillRect(c*scale, r*scale, scale, scale); } }); }); ctx.restore(); }
     function createParticles(x, y, color, count=8) { for(let i=0; i<count; i++) particles.push({x, y, vx:(Math.random()-0.5)*12, vy:(Math.random()-0.5)*12, life:25, color}); }
-
-
-
-    function handleEnvEffects() {
-
-        if (Math.random() > 0.9) {
-
-            if (currentMap.effect === 'snow') envParticles.push({x:Math.random()*W, y:-10, vx:(Math.random()-0.5)*2, vy:2+Math.random()*2, size:3, c:'#fff'});
-
-            if (currentMap.effect === 'rain') envParticles.push({x:Math.random()*W, y:-10, vx:0, vy:10, size:2, c:'#74c0fc'});
-
-            if (currentMap.effect === 'embers') envParticles.push({x:Math.random()*W, y:H, vx:(Math.random()-0.5)*4, vy:-(1+Math.random()*2), size:4, c:'#ff4500'});
-
-            if (currentMap.effect === 'bubbles') envParticles.push({x:Math.random()*W, y:H, vx:0, vy:-(2+Math.random()*2), size:5, c:'rgba(255,255,255,0.3)'});
-
-            if (currentMap.effect === 'leaves') envParticles.push({x:Math.random()*W, y:-10, vx:Math.random()*3, vy:2, size:6, c:'#2b8a3e'});
-
-            if (currentMap.effect === 'dust') envParticles.push({x:W, y:GROUND_Y-Math.random()*100, vx:-5, vy:0, size:2, c:'#d4a373'});
-
-        }
-
-        envParticles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.size, p.size); if (p.y > H || p.y < -50 || p.x > W || p.x < -50) envParticles.splice(i, 1); });
-
-    }
-
-
+    function handleEnvEffects() { if (Math.random() > 0.9) { if (currentMap.effect === 'snow') envParticles.push({x:Math.random()*W, y:-10, vx:(Math.random()-0.5)*2, vy:2+Math.random()*2, size:3, c:'#fff'}); if (currentMap.effect === 'rain') envParticles.push({x:Math.random()*W, y:-10, vx:0, vy:10, size:2, c:'#74c0fc'}); if (currentMap.effect === 'embers') envParticles.push({x:Math.random()*W, y:H, vx:(Math.random()-0.5)*4, vy:-(1+Math.random()*2), size:4, c:'#ff4500'}); if (currentMap.effect === 'bubbles') envParticles.push({x:Math.random()*W, y:H, vx:0, vy:-(2+Math.random()*2), size:5, c:'rgba(255,255,255,0.3)'}); if (currentMap.effect === 'leaves') envParticles.push({x:Math.random()*W, y:-10, vx:Math.random()*3, vy:2, size:6, c:'#2b8a3e'}); if (currentMap.effect === 'dust') envParticles.push({x:W, y:GROUND_Y-Math.random()*100, vx:-5, vy:0, size:2, c:'#d4a373'}); } envParticles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.size, p.size); if (p.y > H || p.y < -50 || p.x > W || p.x < -50) envParticles.splice(i, 1); }); }
 
     function loop() {
-
-        ctx.save();
-
-        if (screenShake > 0) { ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake); screenShake *= 0.9; if (screenShake < 0.5) screenShake = 0; }
-
-        ctx.fillStyle = currentMap.bg; ctx.fillRect(0, 0, W, H);
-
-        handleEnvEffects();
-
-        ctx.fillStyle = currentMap.ground; ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
-
-        ctx.fillStyle = currentMap.accent; ctx.fillRect(0, GROUND_Y, W, 4);
-
+        ctx.save(); if (screenShake > 0) { ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake); screenShake *= 0.9; if (screenShake < 0.5) screenShake = 0; } ctx.fillStyle = currentMap.bg; ctx.fillRect(0, 0, W, H); handleEnvEffects(); ctx.fillStyle = currentMap.ground; ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y); ctx.fillStyle = currentMap.accent; ctx.fillRect(0, GROUND_Y, W, 4);
         if (gameState === 'PLAYING') {
-
             p1.update(p2); p2.update(p1); p1.draw(); p2.draw();
-
-            projectiles.forEach((proj, i) => { proj.x += proj.vx; ctx.fillStyle = proj.c === 'super' ? '#fcc419' : '#fff'; ctx.fillRect(proj.x, proj.y, 12, 6); const opp = proj.owner === 1 ? p2 : p1; if (proj.x > opp.x && proj.x < opp.x+opp.w && proj.y > opp.y && proj.y < opp.y+opp.h) { opp.takeHit(proj.dmg); projectiles.splice(i, 1); } if (proj.x < -50 || proj.x > W+50) projectiles.splice(i, 1); });
-
+            projectiles.forEach((proj, i) => { proj.x += proj.vx; ctx.fillStyle = proj.c === 'super' ? '#fcc419' : '#fff'; ctx.fillRect(proj.x, proj.y, 12, 6); const opp = proj.owner === 1 ? p2 : p1, atk = proj.owner === 1 ? p1 : p2; if (proj.x > opp.x && proj.x < opp.x+opp.w && proj.y > opp.y && proj.y < opp.y+opp.h) { opp.takeHit(proj.dmg); atk.addCombo(); projectiles.splice(i, 1); } if (proj.x < -50 || proj.x > W+50) projectiles.splice(i, 1); });
             particles.forEach((part, i) => { part.x+=part.vx; part.y+=part.vy; part.life--; if(part.life<=0) particles.splice(i,1); ctx.fillStyle=part.color; ctx.fillRect(part.x, part.y, 4, 4); });
-
             document.getElementById('p1-hp').style.width = Math.max(0, (p1.hp/p1.maxHp)*100) + '%'; document.getElementById('p2-hp').style.width = Math.max(0, (p2.hp/p2.maxHp)*100) + '%'; document.getElementById('p1-super').style.width = Math.min(100, p1.superMeter) + '%'; document.getElementById('p2-super').style.width = Math.min(100, p2.superMeter) + '%';
-
-            if(p1.type === 'ranged') document.getElementById('p1-ammo').innerText = p1.isReloading ? "RELOADING" : `AMMO: ${10-p1.shotsFired}`; else document.getElementById('p1-ammo').innerText = "MELEE";
-
-            if(p2.type === 'ranged') document.getElementById('p2-ammo').innerText = p2.isReloading ? "RELOADING" : `AMMO: ${10-p2.shotsFired}`; else document.getElementById('p2-ammo').innerText = "MELEE";
-
-            if (p1.hp <= 0 || p2.hp <= 0) { gameState = 'OVER'; document.getElementById('winner-text').innerText = p1.hp <= 0 ? "P2 WINS!" : "P1 WINS!"; document.getElementById('victory-screen').classList.remove('hidden'); }
-
-        } else if (gameState === 'OVER') { p1.draw(); p2.draw(); }
-
-        if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash/10})`; ctx.fillRect(0,0,W,H); flash--; }
-
-        ctx.restore(); requestAnimationFrame(loop);
-
+            document.getElementById('p1-ammo').innerText = p1.type === 'ranged' ? (p1.isReloading ? "RELOADING" : `AMMO: ${10-p1.shotsFired}`) : "MELEE";
+            document.getElementById('p2-ammo').innerText = p2.type === 'ranged' ? (p2.isReloading ? "RELOADING" : `AMMO: ${10-p2.shotsFired}`) : "MELEE";
+            if (p1.hp <= 0 || p2.hp <= 0) { 
+                gameState = 'OVER'; const p1Won = p1.hp > 0; document.getElementById('winner-text').innerText = p1Won ? "VICTORY!" : "DEFEAT!";
+                if (isRankedMode) { const rpGain = p1Won ? 25 : -15, oldRank = getRankInfo(userRP).name; userRP = Math.max(0, userRP + rpGain); localStorage.setItem('pixelBrawlerRP', userRP); const newRank = getRankInfo(userRP).name; let res = `<span style="color:${rpGain > 0 ? '#00ffcc':'#ff3e3e'}">${rpGain > 0 ? '+':''}${rpGain} RP</span>`; if (oldRank !== newRank) res += `<br><span class="rank-badge">RANK UP: ${newRank}!</span>`; document.getElementById('rank-result').innerHTML = res; }
+                document.getElementById('victory-screen').classList.remove('hidden'); 
+            }
+        } else if (gameState === 'OVER') { p1.draw(); p2.draw(); } if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash/10})`; ctx.fillRect(0,0,W,H); flash--; } ctx.restore(); requestAnimationFrame(loop);
     }
-
-    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-
-    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    loop();
-
+    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true); window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false); loop();
 </script>
-
 </body>
-
 </html>
