@@ -41,8 +41,7 @@
         .rp-text { color: #00ffcc; font-size: 18px; margin-bottom: 20px; }
         #matchmaking-screen h2 { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        .rank-up-anim { color: #00ffcc; font-weight: bold; animation: slideUp 2s forwards; }
-        @keyframes slideUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-50px); opacity: 0; } }
+        #selection-timer { color: #ff3e3e; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -66,7 +65,7 @@
 
         <div id="matchmaking-screen" class="overlay hidden">
             <h2 style="color: #00ffcc;">FINDING REAL PLAYERS...</h2>
-            <p id="match-timer">00:03</p>
+            <p id="match-timer">00:00</p>
             <p style="font-size: 12px; color: #555;">Server: North America (West)</p>
         </div>
 
@@ -78,6 +77,7 @@
         </div>
 
         <div id="char-selection" class="overlay hidden">
+            <div id="selection-timer" class="hidden">SELECT OR LOSE RP: 30s</div>
             <h2 id="selection-title">P1: SELECT HERO</h2>
             <div class="grid" id="char-grid"></div>
         </div>
@@ -101,6 +101,7 @@
     const SUB_RANKS = ["I", "II", "III"];
     let userRP = parseInt(localStorage.getItem('pixelBrawlerRP')) || 0;
     let isRankedMode = false;
+    let charTimerInterval = null;
 
     function getRankInfo(rp) {
         const tierSize = 100;
@@ -129,10 +130,15 @@
         document.getElementById('ranked-menu').classList.add('hidden');
         document.getElementById('matchmaking-screen').classList.remove('hidden');
         isRankedMode = true;
-        let timeLeft = 3;
+        
+        // Random time between 1 and 10 seconds
+        let timeLeft = Math.floor(Math.random() * 10) + 1;
+        
+        document.getElementById('match-timer').innerText = `00:${timeLeft < 10 ? '0' + timeLeft : timeLeft}`;
+
         const interval = setInterval(() => {
             timeLeft--;
-            document.getElementById('match-timer').innerText = `00:0${timeLeft}`;
+            document.getElementById('match-timer').innerText = `00:${timeLeft < 10 ? '0' + timeLeft : timeLeft}`;
             if (timeLeft <= 0) {
                 clearInterval(interval);
                 document.getElementById('matchmaking-screen').classList.add('hidden');
@@ -236,6 +242,27 @@
         document.getElementById('victory-screen').classList.add('hidden');
         document.getElementById('char-selection').classList.remove('hidden');
         document.getElementById('selection-title').innerText = "P1: SELECT HERO";
+        
+        const timerEl = document.getElementById('selection-timer');
+        if(isRankedMode) {
+            timerEl.classList.remove('hidden');
+            let timeLeft = 30;
+            timerEl.innerText = `SELECT OR LOSE RP: ${timeLeft}s`;
+            charTimerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = `SELECT OR LOSE RP: ${timeLeft}s`;
+                if(timeLeft <= 0) {
+                    clearInterval(charTimerInterval);
+                    userRP = Math.max(0, userRP - 50);
+                    localStorage.setItem('pixelBrawlerRP', userRP);
+                    alert("Time's up! You lost 50 RP for failing to select.");
+                    resetToMenu();
+                }
+            }, 1000);
+        } else {
+            timerEl.classList.add('hidden');
+        }
+
         const grid = document.getElementById('char-grid'); grid.innerHTML = '';
         Object.keys(CLASSES).forEach(key => {
             const data = CLASSES[key];
@@ -246,6 +273,7 @@
                 if (selectingPlayer === 1) { 
                     selectedP1 = key; 
                     if(vsBot || isRankedMode) {
+                        clearInterval(charTimerInterval);
                         const randomBot = Object.keys(CLASSES)[Math.floor(Math.random() * Object.keys(CLASSES).length)];
                         showMapSelection(selectedP1, randomBot);
                     } else { selectingPlayer = 2; card.classList.add('selected'); document.getElementById('selection-title').innerText = "P2: SELECT HERO"; }
@@ -276,13 +304,21 @@
         document.getElementById('map-selection').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
         document.getElementById('p1-name').innerText = c1.toUpperCase();
-        const fakeNames = ["ShadowNinja", "BrawlStar_07", "DarkVoid", "PixelKing", "GlitchFixer"];
-        const p2Display = isRankedMode ? fakeNames[Math.floor(Math.random()*fakeNames.length)] : c2.toUpperCase();
-        document.getElementById('p2-name').innerText = (vsBot && !isRankedMode) ? `${c2.toUpperCase()} (${botDiff.toUpperCase()} BOT)` : p2Display;
+        
+        const p2Display = isRankedMode ? "OPPONENT" : c2.toUpperCase();
+        document.getElementById('p2-name').innerText = (vsBot && !isRankedMode) ? `${c2.toUpperCase()} (BOT)` : p2Display;
         gameState = 'PLAYING';
     }
 
-    function resetToMenu() { isRankedMode = false; gameState = 'MENU'; document.getElementById('victory-screen').classList.add('hidden'); document.getElementById('ranked-menu').classList.add('hidden'); document.getElementById('hud').classList.add('hidden'); document.getElementById('menu').classList.remove('hidden'); }
+    function resetToMenu() { 
+        clearInterval(charTimerInterval);
+        isRankedMode = false; 
+        gameState = 'MENU'; 
+        document.getElementById('victory-screen').classList.add('hidden'); 
+        document.getElementById('ranked-menu').classList.add('hidden'); 
+        document.getElementById('hud').classList.add('hidden'); 
+        document.getElementById('menu').classList.remove('hidden'); 
+    }
 
     class Player {
         constructor(x, y, id, classKey, isBot) {
@@ -372,7 +408,6 @@
             ctx.fillStyle = this.id === 1 ? '#00ffcc' : '#7048e8'; 
             const bob = Math.sin(Date.now() / 200) * 5; 
             
-            // LOGIC FOR HOVER TEXT
             let displayName = this.id === 1 ? "P1" : document.getElementById('p2-name').innerText;
             if (isRankedMode && this.id === 1) displayName = "YOU";
             
